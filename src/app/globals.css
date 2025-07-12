@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 font-sans;
+  }
+}
+
+/* 博物馆主题样式 */
+.museum-card {
+  @apply bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300;
+}
+
+.museum-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.exhibit-content {
+  @apply max-w-none text-gray-800 leading-relaxed;
+}
+
+.exhibit-content h1 {
+  @apply text-3xl font-bold mb-4;
+}
+
+.exhibit-content h2 {
+  @apply text-2xl font-semibold mb-3;
+}
+
+.exhibit-content p {
+  @apply mb-4 leading-relaxed;
+}
+
+.exhibit-content img {
+  @apply rounded-lg shadow-md;
+}
+
+.category-badge {
+  @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.emotion-bar {
+  @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
+}
+
+.emotion-fill {
+  @apply h-full transition-all duration-500 ease-out;
+} 
