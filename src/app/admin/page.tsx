@@ -221,7 +221,7 @@ function EditExhibitForm({
 
     const submitData = {
       ...formData,
-      tags: formData.tags ? formData.tags.split(",").map(tag => tag.trim()) : [],
+      tags: formData.tags ? formData.tags.split(",").map((tag: string) => tag.trim()) : [],
       exhibitDate: new Date(formData.exhibitDate),
     };
     
@@ -478,7 +478,7 @@ function CreateExhibitForm({
     const submitData = {
       ...formData,
       categoryId,
-      tags: formData.tags ? formData.tags.split(",").map(tag => tag.trim()) : [],
+      tags: formData.tags ? formData.tags.split(",").map((tag: string) => tag.trim()) : [],
       exhibitDate: new Date(formData.exhibitDate), // 转换用户选择的时间
     };
     
