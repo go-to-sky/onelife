@@ -65,7 +65,7 @@ export default async function HomePage() {
               <strong>记录目的：</strong>构建个人生命史，回顾人生的关键节点和成长轨迹。可以每年年底整理一次，形成年度大事记。
             </div>
             <Link 
-              href="/admin"
+              href="/admin?category=milestones"
               className="inline-block w-full text-center mt-4 px-3 py-2 bg-amber-200 text-amber-800 rounded-md text-sm font-medium hover:bg-amber-300 transition-colors"
             >
               记录里程碑
@@ -90,7 +90,7 @@ export default async function HomePage() {
               <strong>记录目的：</strong>培养感恩和发现美的能力，提升幸福感，对抗生活的平淡和焦虑。
             </div>
             <Link 
-              href="/admin"
+              href="/admin?category=daily-joys"
               className="inline-block w-full text-center mt-4 px-3 py-2 bg-green-200 text-green-800 rounded-md text-sm font-medium hover:bg-green-300 transition-colors"
             >
               记录小确幸
@@ -115,7 +115,7 @@ export default async function HomePage() {
               <strong>记录目的：</strong>复盘和反思，将挫折转化为成长的养分，看到自己的坚韧和进步。
             </div>
             <Link 
-              href="/admin"
+              href="/admin?category=growth-challenges"
               className="inline-block w-full text-center mt-4 px-3 py-2 bg-blue-200 text-blue-800 rounded-md text-sm font-medium hover:bg-blue-300 transition-colors"
             >
               记录成长
@@ -140,7 +140,7 @@ export default async function HomePage() {
               <strong>等待您来定义：</strong>这个空间留给您的创意和想象，定制属于您的独特记录方式。
             </div>
             <Link 
-              href="/admin"
+              href="/admin?category=exploration"
               className="inline-block w-full text-center mt-4 px-3 py-2 bg-purple-200 text-purple-800 rounded-md text-sm font-medium hover:bg-purple-300 transition-colors"
             >
               开始探索

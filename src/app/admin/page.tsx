@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { api } from "../../trpc/react";
 
 export default function AdminPage() {
@@ -10,13 +12,74 @@ export default function AdminPage() {
   const status = "authenticated";
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // 获取URL参数中的分类信息
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams.get('category');
+  
+  // 分类配置
+  const categoryConfigs = {
+    'milestones': {
+      title: '大事记 / 人生里程碑',
+      description: '记录对人生有重大影响或转折意义的事件',
+      icon: '🏆',
+      color: 'amber',
+      examples: '毕业、第一份工作、升职、结婚、生子、买房、创业等'
+    },
+    'daily-joys': {
+      title: '生活琐事 / 日常小确幸',
+      description: '记录日常生活中微小但确切的幸福瞬间',
+      icon: '🌸',
+      color: 'green',
+      examples: '美食、晚霞、好书、愉快长谈、午后阳光、宠物陪伴等'
+    },
+    'growth-challenges': {
+      title: '挑战与成长',
+      description: '记录遇到的困难、错误、恐惧以及成长经验',
+      icon: '💪',
+      color: 'blue',
+      examples: '失败项目、争执反思、新技能学习、公开演讲挑战等'
+    },
+    'exploration': {
+      title: '探索空间',
+      description: '记录您的创意想法和独特的生活体验',
+      icon: '🎯',
+      color: 'purple',
+      examples: '梦境记录、创意灵感、人际关系图谱、生活哲学等'
+    }
+  };
+  
+  const currentCategory = categoryParam ? categoryConfigs[categoryParam as keyof typeof categoryConfigs] : null;
 
-  // Queries - 在管理页面显示所有可见性的展品
+  // 获取分类数据
+  const { data: categories = [] } = api.category.getAll.useQuery();
+
+  // 根据categoryParam获取目标分类ID
+  const getTargetCategoryId = () => {
+    if (!categoryParam || !categories.length) return undefined;
+    
+    const categoryMap: { [key: string]: string } = {
+      'milestones': '人生账本',
+      'daily-joys': '时间切片', 
+      'growth-challenges': '情绪肖像',
+      'exploration': '梦境档案'
+    };
+    
+    const targetCategoryName = categoryMap[categoryParam];
+    const foundCategory = categories.find(cat => cat.name === targetCategoryName);
+    return foundCategory ? foundCategory.id : undefined;
+  };
+
+  const targetCategoryId = getTargetCategoryId();
+
+  // Queries - 根据分类过滤展品
   const { data: exhibits, refetch: refetchExhibits } = api.exhibit.getAll.useQuery(
-    { showAll: true }, // 显示所有展品，不管可见性
+    { 
+      showAll: true, // 显示所有可见性的展品
+      categoryId: targetCategoryId // 按分类过滤
+    },
     { enabled: true }
   );
-  const { data: categories = [] } = api.category.getAll.useQuery();
 
   // Mutations
   const createExhibit = api.exhibit.create.useMutation({
@@ -61,17 +124,44 @@ export default function AdminPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">管理后台</h1>
-          <p className="text-gray-600">
-            欢迎回来，{session.user.name || session.user.email}
-          </p>
+          {currentCategory ? (
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-4xl">{currentCategory.icon}</span>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">{currentCategory.title}</h1>
+                <p className="text-gray-600">{currentCategory.description}</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900">管理后台</h1>
+              <p className="text-gray-600">
+                欢迎回来，{session.user.name || session.user.email}
+              </p>
+            </>
+          )}
+          {currentCategory && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>示例内容：</strong>{currentCategory.examples}
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
+          {currentCategory && (
+            <Link
+              href="/admin"
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
+            >
+              ← 返回全部
+            </Link>
+          )}
           <button
             onClick={() => setIsCreating(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
           >
-            创建新展品
+            {currentCategory ? `记录${currentCategory.title.split(' / ')[0]}` : '创建新展品'}
           </button>
           <button
             onClick={() => alert("认证功能暂未启用")}
@@ -89,6 +179,7 @@ export default function AdminPage() {
           onSubmit={(data) => createExhibit.mutate(data)}
           onCancel={() => setIsCreating(false)}
           isLoading={createExhibit.isLoading}
+          categoryParam={categoryParam}
         />
       )}
 
@@ -107,11 +198,28 @@ export default function AdminPage() {
       <div className="space-y-6">
         {!exhibits?.items || exhibits.items.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">📝</div>
+            <div className="text-gray-400 text-6xl mb-4">
+              {currentCategory ? currentCategory.icon : '📝'}
+            </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              还没有展品
+              {currentCategory 
+                ? `还没有${currentCategory.title.split(' / ')[0]}记录` 
+                : '还没有展品'
+              }
             </h3>
-            <p className="text-gray-600">创建您的第一个展品来开始记录人生</p>
+            <p className="text-gray-600">
+              {currentCategory 
+                ? `开始记录您的${currentCategory.title.split(' / ')[0]}，${currentCategory.description}` 
+                : '创建您的第一个展品来开始记录人生'
+              }
+            </p>
+            {currentCategory && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg text-left max-w-md mx-auto">
+                <p className="text-sm text-gray-700">
+                  <strong>记录建议：</strong>{currentCategory.examples}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           exhibits.items.map((exhibit) => (
@@ -431,23 +539,52 @@ function CreateExhibitForm({
   onSubmit,
   onCancel,
   isLoading,
+  categoryParam,
 }: {
   categories: any[];
   onSubmit: (data: any) => void;
   onCancel: () => void;
   isLoading: boolean;
+  categoryParam?: string | null;
 }) {
+  // 根据categoryParam预设分类
+  const getInitialCategoryId = () => {
+    if (!categoryParam || !categories.length) return "";
+    
+    // 根据categoryParam找到对应的分类
+    const categoryMap: { [key: string]: string } = {
+      'milestones': '人生账本',
+      'daily-joys': '时间切片', 
+      'growth-challenges': '情绪肖像',
+      'exploration': '梦境档案'
+    };
+    
+    const targetCategoryName = categoryMap[categoryParam];
+    const foundCategory = categories.find(cat => cat.name === targetCategoryName);
+    return foundCategory ? foundCategory.id : "";
+  };
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     content: "",
     coverImage: "",
-    categoryId: "",
+    categoryId: getInitialCategoryId(),
     visibility: "PUBLIC" as const,
     emotionScore: 5,
     tags: "",
     exhibitDate: new Date().toISOString().slice(0, 16), // 默认为当前时间
   });
+
+  // 当categories加载完成后，更新categoryId
+  useEffect(() => {
+    if (categoryParam && categories.length > 0 && !formData.categoryId) {
+      const initialCategoryId = getInitialCategoryId();
+      if (initialCategoryId) {
+        setFormData(prev => ({ ...prev, categoryId: initialCategoryId }));
+      }
+    }
+  }, [categories, categoryParam, formData.categoryId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
