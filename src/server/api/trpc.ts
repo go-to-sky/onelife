@@ -32,12 +32,20 @@ export const createTRPCContext = async (opts: {
   res?: Response;
 }) => {
   // TODO: 在 App Router 中正确获取 session
-  // 暂时跳过认证，先让应用运行起来
-  const session = null;
+  // 暂时使用模拟用户来让应用运行起来
+  const mockSession = {
+    user: { 
+      id: "temp-user", 
+      name: "临时用户", 
+      email: "temp@example.com",
+      image: null
+    },
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30天后过期
+  };
 
   const context = {
     db,
-    session,
+    session: mockSession,
     ...opts,
   };
 
