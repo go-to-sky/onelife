@@ -1,8 +1,13 @@
 import { api } from "../../../trpc/server";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import Link from "next/link";
 import Image from "next/image";
+// Markdown 安全增强已启用（remark-gfm、rehype-sanitize）
+import CommentForm from "./CommentForm";
+import { revalidatePath } from "next/cache";
 
 interface PageProps {
   params: {
@@ -113,7 +118,9 @@ export default async function ExhibitPage({ params }: PageProps) {
         {/* Content */}
         <div className="museum-card p-8 mb-8">
           <div className="exhibit-content">
-            <ReactMarkdown>{exhibit.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+              {exhibit.content}
+            </ReactMarkdown>
           </div>
         </div>
 
@@ -230,6 +237,15 @@ export default async function ExhibitPage({ params }: PageProps) {
               ))}
             </div>
           )}
+
+          {/* Comment Form */}
+          <CommentForm
+            exhibitId={exhibit.id}
+            onSubmitted={() => {
+              // 触发页面刷新以获取最新评论
+              revalidatePath(`/exhibit/${exhibit.slug}`);
+            }}
+          />
         </div>
 
         {/* Back to Home */}

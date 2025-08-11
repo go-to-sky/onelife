@@ -32,13 +32,14 @@ export const createTRPCContext = async (opts: {
   res?: Response;
 }) => {
   // TODO: 在 App Router 中正确获取 session
-  // 暂时使用模拟用户来让应用运行起来
+  // 暂时使用模拟管理员用户来让应用运行起来
   const mockSession = {
     user: { 
-      id: "temp-user", 
-      name: "临时用户", 
-      email: "temp@example.com",
-      image: null
+      id: "temp-user-id", 
+      name: "演示用户", 
+      email: "demo@example.com",
+      image: null,
+      isAdmin: true  // 添加管理员标识
     },
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30天后过期
   };
@@ -128,3 +129,22 @@ const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
  * @see https://trpc.io/docs/procedures
  */
 export const protectedProcedure = t.procedure.use(enforceUserIsAuthed); 
+
+/**
+ * Admin-only procedure. Requires `session.user.isAdmin === true`.
+ */
+const enforceAdmin = t.middleware(({ ctx, next }) => {
+  if (!ctx.session || !ctx.session.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  if (ctx.session.user.isAdmin !== true) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session.user },
+    },
+  });
+});
+
+export const adminProcedure = t.procedure.use(enforceAdmin);

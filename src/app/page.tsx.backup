@@ -1,0 +1,1461 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { api } from "~/trpc/react";
+import Link from "next/link";
+import Image from "next/image";
+
+interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "PENDING" | "COMPLETED";
+  category: "STUDY_LONG_TERM" | "STUDY_SHORT_TERM" | "LIFE_LONG_TERM" | "LIFE_SHORT_TERM"; // 更新分类
+  taskDate: Date;
+  completedAt: Date | null;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Exhibit {
+  id: string;
+  title: string;
+  description: string | null;
+  content: string;
+  mood: string;
+  location: string | null;
+  weather: string | null;
+  imageUrl: string | null;
+  slug: string;
+  createdAt: Date;
+  updatedAt: Date;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    color: string;
+    icon: string | null;
+  };
+  payload?: {
+    specialTags?: string[];
+  };
+}
+
+export default function HomePage() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
+  
+  // 状态管理
+  const [taskCategory, setTaskCategory] = useState<"STUDY_LONG_TERM" | "STUDY_SHORT_TERM" | "LIFE_LONG_TERM" | "LIFE_SHORT_TERM">("LIFE_LONG_TERM");
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [taskType, setTaskType] = useState<"PENDING" | "COMPLETED">("PENDING");
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const [statisticsType, setStatisticsType] = useState<"week" | "month" | "last7days" | "last30days" | "last90days" | "year" | "custom">("week");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [expandedEntertainment, setExpandedEntertainment] = useState(false);
+
+  const { data: exhibitData } = api.exhibit.getAll.useQuery({});
+  const { data: categories = [] } = api.category.getAll.useQuery();
+
+  // 分别获取四种类型的任务
+  const { data: studyLongTasks = [], refetch: refetchStudyLongTasks } = api.task.getToday.useQuery({ 
+    category: "STUDY_LONG_TERM" 
+  });
+  const { data: studyShortTasks = [], refetch: refetchStudyShortTasks } = api.task.getToday.useQuery({ 
+    category: "STUDY_SHORT_TERM" 
+  });
+  const { data: lifeLongTasks = [], refetch: refetchLifeLongTasks } = api.task.getToday.useQuery({ 
+    category: "LIFE_LONG_TERM" 
+  });
+  const { data: lifeShortTasks = [], refetch: refetchLifeShortTasks } = api.task.getToday.useQuery({ 
+    category: "LIFE_SHORT_TERM" 
+  });
+
+  // 历史任务查询
+  const { data: historyTasks = [] } = api.task.getByDate.useQuery(
+    { date: historyDate },
+    { enabled: showHistory }
+  );
+
+  // 统计数据查询
+  const isCustomRangeValid = statisticsType === "custom" && customStartDate && customEndDate && customStartDate <= customEndDate;
+  const shouldEnableStatistics = Boolean(showStatistics && (statisticsType !== "custom" || isCustomRangeValid));
+  
+  // 调试信息
+  console.log('统计查询状态:', {
+    showStatistics,
+    statisticsType,
+    customStartDate,
+    customEndDate,
+    isCustomRangeValid,
+    shouldEnableStatistics
+  });
+  
+  const { data: statisticsData } = api.task.getStatistics.useQuery(
+    {
+      type: statisticsType,
+      ...(statisticsType === "custom" && {
+        startDate: customStartDate,
+        endDate: customEndDate,
+      }),
+    },
+    { 
+      enabled: shouldEnableStatistics
+    }
+  );
+
+  const exhibits = exhibitData?.items || [];
+
+  // 创建任务
+  const createTask = api.task.create.useMutation({
+    onSuccess: () => {
+      setNewTaskTitle("");
+      setIsAddingTask(false);
+      // 根据分类刷新对应的任务列表
+      if (taskCategory === "STUDY_LONG_TERM") {
+        refetchStudyLongTasks();
+      } else if (taskCategory === "STUDY_SHORT_TERM") {
+        refetchStudyShortTasks();
+      } else if (taskCategory === "LIFE_LONG_TERM") {
+        refetchLifeLongTasks();
+      } else if (taskCategory === "LIFE_SHORT_TERM") {
+        refetchLifeShortTasks();
+      }
+    },
+  });
+
+  // 切换任务状态
+  const toggleStatus = api.task.toggleStatus.useMutation({
+    onSuccess: () => {
+      refetchStudyLongTasks();
+      refetchStudyShortTasks();
+      refetchLifeLongTasks();
+      refetchLifeShortTasks();
+    },
+  });
+
+  // 删除任务
+  const deleteTask = api.task.delete.useMutation({
+    onSuccess: () => {
+      refetchStudyLongTasks();
+      refetchStudyShortTasks();
+      refetchLifeLongTasks();
+      refetchLifeShortTasks();
+    },
+  });
+
+  // 客户端挂载后才开始更新时间
+  useEffect(() => {
+    setMounted(true);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // 学习类任务分组
+  const studyLongPending = studyLongTasks.filter((task: any) => task.status === "PENDING");
+  const studyLongCompleted = studyLongTasks.filter((task: any) => task.status === "COMPLETED");
+  const studyShortPending = studyShortTasks.filter((task: any) => task.status === "PENDING");
+  const studyShortCompleted = studyShortTasks.filter((task: any) => task.status === "COMPLETED");
+  
+  // 生活类任务分组  
+  const lifeLongPending = lifeLongTasks.filter((task: any) => task.status === "PENDING");
+  const lifeLongCompleted = lifeLongTasks.filter((task: any) => task.status === "COMPLETED");
+  const lifeShortPending = lifeShortTasks.filter((task: any) => task.status === "PENDING");
+  const lifeShortCompleted = lifeShortTasks.filter((task: any) => task.status === "COMPLETED");
+
+  const handleCreateTask = () => {
+    if (!newTaskTitle.trim()) return;
+
+    createTask.mutate({
+      title: newTaskTitle.trim(),
+      taskDate: today,
+      status: taskType,
+      category: taskCategory,
+    });
+    
+    setNewTaskTitle("");
+    setIsAddingTask(false);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Hero Section */}
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          一个人的100年
+        </h1>
+        <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          这里收藏着生命中每一个珍贵的瞬间，每一份感动，每一次成长。
+          让我们一起探索人生的美好与意义。
+        </p>
+      </div>
+
+      {/* 当前时间 */}
+      <div className="text-center mb-8">
+        <div className="inline-block bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg px-6 py-4 border border-blue-100">
+          <div className="text-sm text-gray-600 mb-1">今日时光</div>
+          <div className="text-2xl font-bold text-gray-900 mb-1">
+            {mounted ? currentTime.toLocaleDateString('zh-CN', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric',
+              weekday: 'long' 
+            }) : new Date().toLocaleDateString('zh-CN', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric',
+              weekday: 'long' 
+            })}
+          </div>
+          <div className="text-lg text-blue-600 font-mono" suppressHydrationWarning>
+            {mounted ? currentTime.toLocaleTimeString('zh-CN') : '--:--:--'}
+          </div>
+        </div>
+      </div>
+
+      {/* 分类任务管理 */}
+      <div className="mb-12">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-6 text-center">今日事务管理</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 学习-长期任务 */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-blue-900 flex items-center gap-3">
+                📚 学习-长期任务
+              </h3>
+              <button
+                onClick={() => {
+                  setTaskCategory("STUDY_LONG_TERM");
+                  setIsAddingTask(!isAddingTask);
+                }}
+                className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                {isAddingTask && taskCategory === "STUDY_LONG_TERM" ? "取消" : "+ 添加学习-长期任务"}
+              </button>
+            </div>
+
+            {/* 学习类添加任务表单 */}
+            {isAddingTask && taskCategory === "STUDY_LONG_TERM" && (
+              <div className="mb-6 p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="输入学习-长期任务..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyPress={(e) => e.key === "Enter" && handleCreateTask()}
+                  autoFocus
+                />
+                
+                <div className="flex items-center gap-4 mb-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="PENDING"
+                      checked={taskType === "PENDING"}
+                      onChange={(e) => setTaskType(e.target.value as "PENDING")}
+                    />
+                    计划学习
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="COMPLETED"
+                      checked={taskType === "COMPLETED"}
+                      onChange={(e) => setTaskType(e.target.value as "COMPLETED")}
+                    />
+                    已经完成
+                  </label>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateTask}
+                    disabled={!newTaskTitle.trim() || createTask.isPending}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                  >
+                    {createTask.isPending ? "创建中..." : "创建"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTask(false);
+                      setNewTaskTitle("");
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 学习类待完成任务 */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-blue-800 mb-3">📋 待完成</h4>
+              <div className="space-y-2">
+                {studyLongPending.length === 0 ? (
+                  <div className="text-center text-blue-600 py-4">
+                    <div className="text-2xl mb-2">📖</div>
+                    <p>暂无待完成的学习-长期任务</p>
+                  </div>
+                ) : (
+                  studyLongPending.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-white border border-blue-200 rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 border-2 border-blue-300 rounded hover:border-blue-500 transition-colors"
+                      />
+                      <span className="flex-1 text-gray-900">{task.title}</span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 学习类已完成任务 */}
+            <div>
+              <h4 className="text-md font-medium text-blue-800 mb-3">✅ 已完成 ({studyLongCompleted.length})</h4>
+              <div className="space-y-2">
+                {studyLongCompleted.length === 0 ? (
+                  <div className="text-center text-blue-600 py-2">
+                    <p className="text-sm">暂无已完成的学习-长期任务</p>
+                  </div>
+                ) : (
+                  studyLongCompleted.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-blue-100 border border-blue-200 rounded-lg"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 bg-blue-500 text-white rounded flex items-center justify-center"
+                      >
+                        ✓
+                      </button>
+                      <span className="flex-1 text-gray-900 line-through">{task.title}</span>
+                      <span className="text-xs text-blue-600">
+                        {task.completedAt && new Date(task.completedAt).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 学习-短期任务 */}
+          <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl shadow-sm border border-purple-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-purple-900 flex items-center gap-3">
+                📚 学习-短期任务
+              </h3>
+              <button
+                onClick={() => {
+                  setTaskCategory("STUDY_SHORT_TERM");
+                  setIsAddingTask(!isAddingTask);
+                }}
+                className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                {isAddingTask && taskCategory === "STUDY_SHORT_TERM" ? "取消" : "+ 添加学习-短期任务"}
+              </button>
+            </div>
+
+            {/* 学习类短期添加任务表单 */}
+            {isAddingTask && taskCategory === "STUDY_SHORT_TERM" && (
+              <div className="mb-6 p-4 bg-white rounded-lg border border-purple-200 shadow-sm">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="输入学习-短期任务..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md mb-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  onKeyPress={(e) => e.key === "Enter" && handleCreateTask()}
+                  autoFocus
+                />
+                
+                <div className="flex items-center gap-4 mb-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="PENDING"
+                      checked={taskType === "PENDING"}
+                      onChange={(e) => setTaskType(e.target.value as "PENDING")}
+                    />
+                    计划学习
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="COMPLETED"
+                      checked={taskType === "COMPLETED"}
+                      onChange={(e) => setTaskType(e.target.value as "COMPLETED")}
+                    />
+                    已经完成
+                  </label>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateTask}
+                    disabled={!newTaskTitle.trim() || createTask.isPending}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:opacity-50 transition-colors"
+                  >
+                    {createTask.isPending ? "创建中..." : "创建"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTask(false);
+                      setNewTaskTitle("");
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 学习类短期待完成任务 */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-purple-800 mb-3">📋 待完成</h4>
+              <div className="space-y-2">
+                {studyShortPending.length === 0 ? (
+                  <div className="text-center text-purple-600 py-4">
+                    <div className="text-2xl mb-2">📖</div>
+                    <p>暂无待完成的学习-短期任务</p>
+                  </div>
+                ) : (
+                  studyShortPending.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-white border border-purple-200 rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 border-2 border-purple-300 rounded hover:border-purple-500 transition-colors"
+                      />
+                      <span className="flex-1 text-gray-900">{task.title}</span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 学习类短期已完成任务 */}
+            <div>
+              <h4 className="text-md font-medium text-purple-800 mb-3">✅ 已完成 ({studyShortCompleted.length})</h4>
+              <div className="space-y-2">
+                {studyShortCompleted.length === 0 ? (
+                  <div className="text-center text-purple-600 py-2">
+                    <p className="text-sm">暂无已完成的学习-短期任务</p>
+                  </div>
+                ) : (
+                  studyShortCompleted.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-purple-100 border border-purple-200 rounded-lg"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 bg-purple-500 text-white rounded flex items-center justify-center"
+                      >
+                        ✓
+                      </button>
+                      <span className="flex-1 text-gray-900 line-through">{task.title}</span>
+                      <span className="text-xs text-purple-600">
+                        {task.completedAt && new Date(task.completedAt).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 生活-长期任务 */}
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-sm border border-green-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-green-900 flex items-center gap-3">
+                🏠 生活-长期任务
+              </h3>
+              <button
+                onClick={() => {
+                  setTaskCategory("LIFE_LONG_TERM");
+                  setIsAddingTask(!isAddingTask);
+                }}
+                className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              >
+                {isAddingTask && taskCategory === "LIFE_LONG_TERM" ? "取消" : "+ 添加生活-长期任务"}
+              </button>
+            </div>
+
+            {/* 日常生活类添加任务表单 */}
+            {isAddingTask && taskCategory === "LIFE_LONG_TERM" && (
+              <div className="mb-6 p-4 bg-white rounded-lg border border-green-200 shadow-sm">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="输入生活-长期任务..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  onKeyPress={(e) => e.key === "Enter" && handleCreateTask()}
+                  autoFocus
+                />
+                
+                <div className="flex items-center gap-4 mb-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="PENDING"
+                      checked={taskType === "PENDING"}
+                      onChange={(e) => setTaskType(e.target.value as "PENDING")}
+                    />
+                    计划要做
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="COMPLETED"
+                      checked={taskType === "COMPLETED"}
+                      onChange={(e) => setTaskType(e.target.value as "COMPLETED")}
+                    />
+                    已经完成
+                  </label>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateTask}
+                    disabled={!newTaskTitle.trim() || createTask.isPending}
+                    className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50 transition-colors"
+                  >
+                    {createTask.isPending ? "创建中..." : "创建"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTask(false);
+                      setNewTaskTitle("");
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 日常生活类待完成任务 */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-green-800 mb-3">📋 待完成</h4>
+              <div className="space-y-2">
+                {lifeLongPending.length === 0 ? (
+                  <div className="text-center text-green-600 py-4">
+                    <div className="text-2xl mb-2">🌱</div>
+                    <p>暂无待完成的生活-长期任务</p>
+                  </div>
+                ) : (
+                  lifeLongPending.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-white border border-green-200 rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 border-2 border-green-300 rounded hover:border-green-500 transition-colors"
+                      />
+                      <span className="flex-1 text-gray-900">{task.title}</span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 日常生活类已完成任务 */}
+            <div>
+              <h4 className="text-md font-medium text-green-800 mb-3">✅ 已完成 ({lifeLongCompleted.length})</h4>
+              <div className="space-y-2">
+                {lifeLongCompleted.length === 0 ? (
+                  <div className="text-center text-green-600 py-2">
+                    <p className="text-sm">暂无已完成的生活-长期任务</p>
+                  </div>
+                ) : (
+                  lifeLongCompleted.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-green-100 border border-green-200 rounded-lg"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 bg-green-500 text-white rounded flex items-center justify-center"
+                      >
+                        ✓
+                      </button>
+                      <span className="flex-1 text-gray-900 line-through">{task.title}</span>
+                      <span className="text-xs text-green-600">
+                        {task.completedAt && new Date(task.completedAt).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 生活-短期任务 */}
+          <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-xl shadow-sm border border-orange-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-orange-900 flex items-center gap-3">
+                🏠 生活-短期任务
+              </h3>
+              <button
+                onClick={() => {
+                  setTaskCategory("LIFE_SHORT_TERM");
+                  setIsAddingTask(!isAddingTask);
+                }}
+                className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                {isAddingTask && taskCategory === "LIFE_SHORT_TERM" ? "取消" : "+ 添加生活-短期任务"}
+              </button>
+            </div>
+
+            {/* 日常生活类短期添加任务表单 */}
+            {isAddingTask && taskCategory === "LIFE_SHORT_TERM" && (
+              <div className="mb-6 p-4 bg-white rounded-lg border border-orange-200 shadow-sm">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="输入生活-短期任务..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md mb-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  onKeyPress={(e) => e.key === "Enter" && handleCreateTask()}
+                  autoFocus
+                />
+                
+                <div className="flex items-center gap-4 mb-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="PENDING"
+                      checked={taskType === "PENDING"}
+                      onChange={(e) => setTaskType(e.target.value as "PENDING")}
+                    />
+                    计划要做
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="taskType"
+                      value="COMPLETED"
+                      checked={taskType === "COMPLETED"}
+                      onChange={(e) => setTaskType(e.target.value as "COMPLETED")}
+                    />
+                    已经完成
+                  </label>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateTask}
+                    disabled={!newTaskTitle.trim() || createTask.isPending}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                  >
+                    {createTask.isPending ? "创建中..." : "创建"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTask(false);
+                      setNewTaskTitle("");
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 日常生活类短期待完成任务 */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-orange-800 mb-3">📋 待完成</h4>
+              <div className="space-y-2">
+                {lifeShortPending.length === 0 ? (
+                  <div className="text-center text-orange-600 py-4">
+                    <div className="text-2xl mb-2">🌱</div>
+                    <p>暂无待完成的生活-短期任务</p>
+                  </div>
+                ) : (
+                  lifeShortPending.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-white border border-orange-200 rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 border-2 border-orange-300 rounded hover:border-orange-500 transition-colors"
+                      />
+                      <span className="flex-1 text-gray-900">{task.title}</span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 日常生活类短期已完成任务 */}
+            <div>
+              <h4 className="text-md font-medium text-orange-800 mb-3">✅ 已完成 ({lifeShortCompleted.length})</h4>
+              <div className="space-y-2">
+                {lifeShortCompleted.length === 0 ? (
+                  <div className="text-center text-orange-600 py-2">
+                    <p className="text-sm">暂无已完成的生活-短期任务</p>
+                  </div>
+                ) : (
+                  lifeShortCompleted.map((task: any) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-orange-100 border border-orange-200 rounded-lg"
+                    >
+                      <button
+                        onClick={() => toggleStatus.mutate({ id: task.id })}
+                        className="w-5 h-5 bg-orange-500 text-white rounded flex items-center justify-center"
+                      >
+                        ✓
+                      </button>
+                      <span className="flex-1 text-gray-900 line-through">{task.title}</span>
+                      <span className="text-xs text-orange-600">
+                        {task.completedAt && new Date(task.completedAt).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <button
+                        onClick={() => deleteTask.mutate({ id: task.id })}
+                        className="text-red-500 hover:text-red-700 text-sm transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 历史查看和统计功能 */}
+      <div className="mb-12">
+        <div className="flex justify-center gap-4 mb-6">
+          <button
+            onClick={() => {
+              setShowHistory(!showHistory);
+              setShowStatistics(false);
+            }}
+            className={`px-6 py-2 rounded-lg transition-colors ${
+              showHistory 
+                ? "bg-blue-600 text-white" 
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            📅 历史任务查看
+          </button>
+          <button
+            onClick={() => {
+              setShowStatistics(!showStatistics);
+              setShowHistory(false);
+            }}
+            className={`px-6 py-2 rounded-lg transition-colors ${
+              showStatistics 
+                ? "bg-green-600 text-white" 
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            📊 任务统计
+          </button>
+        </div>
+
+        {/* 历史任务查看 */}
+        {showHistory && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">历史任务查看</h3>
+              <div className="flex items-center gap-4">
+                <input
+                  type="date"
+                  value={historyDate}
+                  onChange={(e) => setHistoryDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600">
+                  共 {historyTasks.length} 项任务
+                </span>
+              </div>
+            </div>
+
+            {historyTasks.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📝</div>
+                <p>该日期没有任务记录</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {["STUDY_LONG_TERM", "STUDY_SHORT_TERM", "LIFE_LONG_TERM", "LIFE_SHORT_TERM"].map((category) => {
+                  const categoryTasks = historyTasks.filter((task: any) => task.category === category);
+                  const categoryNames = {
+                    "STUDY_LONG_TERM": "学习-长期",
+                    "STUDY_SHORT_TERM": "学习-短期", 
+                    "LIFE_LONG_TERM": "生活-长期",
+                    "LIFE_SHORT_TERM": "生活-短期"
+                  };
+                  const categoryColors = {
+                    "STUDY_LONG_TERM": "blue",
+                    "STUDY_SHORT_TERM": "purple",
+                    "LIFE_LONG_TERM": "green", 
+                    "LIFE_SHORT_TERM": "orange"
+                  };
+                  const color = categoryColors[category as keyof typeof categoryColors];
+                  
+                  return (
+                    <div key={category} className={`bg-${color}-50 border border-${color}-200 rounded-lg p-4`}>
+                      <h4 className={`text-sm font-medium text-${color}-800 mb-3`}>
+                        {categoryNames[category as keyof typeof categoryNames]} ({categoryTasks.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {categoryTasks.map((task: any) => (
+                          <div
+                            key={task.id}
+                            className={`text-xs p-2 rounded ${
+                              task.status === "COMPLETED" 
+                                ? `bg-${color}-100 text-${color}-700 line-through` 
+                                : `bg-white border border-${color}-200 text-gray-700`
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {task.status === "COMPLETED" ? "✅" : "⏳"}
+                              <span className="flex-1">{task.title}</span>
+                            </div>
+                            {task.completedAt && (
+                              <div className={`text-xs text-${color}-600 mt-1`}>
+                                完成于 {new Date(task.completedAt).toLocaleTimeString('zh-CN', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 任务统计 */}
+        {showStatistics && statisticsData && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">任务统计</h3>
+              <div className="flex items-center gap-4">
+                <select
+                  value={statisticsType}
+                  onChange={(e) => setStatisticsType(e.target.value as typeof statisticsType)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="week">本周统计</option>
+                  <option value="month">本月统计</option>
+                  <option value="last7days">最近7天</option>
+                  <option value="last30days">最近30天</option>
+                  <option value="last90days">最近90天</option>
+                  <option value="year">本年统计</option>
+                  <option value="custom">自定义范围</option>
+                </select>
+                
+                {/* 自定义日期范围选择器 */}
+                {statisticsType === "custom" && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="开始日期"
+                      />
+                      <span className="text-gray-500">至</span>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="结束日期"
+                      />
+                      <button
+                        onClick={() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          const weekAgo = new Date();
+                          weekAgo.setDate(weekAgo.getDate() - 7);
+                          setCustomStartDate(weekAgo.toISOString().split('T')[0]);
+                          setCustomEndDate(today);
+                        }}
+                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                      >
+                        最近7天
+                      </button>
+                    </div>
+                    {/* 日期范围验证提示 */}
+                    {customStartDate && customEndDate && customStartDate > customEndDate && (
+                      <div className="text-xs text-red-600">
+                        开始日期不能晚于结束日期
+                      </div>
+                    )}
+                    {/* 统计状态提示 */}
+                    {statisticsType === "custom" && (
+                      <div className="text-xs text-gray-500">
+                        {isCustomRangeValid 
+                          ? `将统计 ${customStartDate} 至 ${customEndDate} 的数据`
+                          : "请选择有效的日期范围"
+                        }
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 显示当前统计的日期范围 */}
+                {statisticsData?.dateRange && (
+                  <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                    {new Date(statisticsData.dateRange.startDate).toLocaleDateString('zh-CN')} 
+                    {' ~ '}
+                    {new Date(statisticsData.dateRange.endDate).toLocaleDateString('zh-CN')}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 总体统计 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-blue-600">{statisticsData.totalTasks}</div>
+                <div className="text-sm text-blue-800">总任务数</div>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-green-600">{statisticsData.completedTasks}</div>
+                <div className="text-sm text-green-800">已完成</div>
+              </div>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {statisticsData.totalTasks - statisticsData.completedTasks}
+                </div>
+                <div className="text-sm text-orange-800">未完成</div>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {statisticsData.totalTasks > 0 
+                    ? Math.round((statisticsData.completedTasks / statisticsData.totalTasks) * 100)
+                    : 0}%
+                </div>
+                <div className="text-sm text-purple-800">完成率</div>
+              </div>
+            </div>
+
+            {/* 分类统计 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="text-lg font-medium text-gray-900 mb-4">分类完成情况</h4>
+                <div className="space-y-3">
+                  {Object.entries(statisticsData.categoryStats).map(([category, stats]) => {
+                    const categoryNames = {
+                      "STUDY_LONG_TERM": "学习-长期",
+                      "STUDY_SHORT_TERM": "学习-短期",
+                      "LIFE_LONG_TERM": "生活-长期", 
+                      "LIFE_SHORT_TERM": "生活-短期"
+                    };
+                    const percentage = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+                    
+                    return (
+                      <div key={category} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium">
+                            {categoryNames[category as keyof typeof categoryNames]}
+                          </span>
+                          <span className="text-sm text-gray-600">
+                            {stats.completed}/{stats.total} ({Math.round(percentage)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-lg font-medium text-gray-900 mb-4">每日完成情况</h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {Object.entries(statisticsData.dailyStats)
+                    .sort(([a], [b]) => b.localeCompare(a))
+                    .map(([date, stats]) => {
+                      const percentage = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+                      
+                      return (
+                        <div key={date} className="bg-gray-50 rounded-lg p-2">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-medium">
+                              {new Date(date).toLocaleDateString('zh-CN', {
+                                month: 'short',
+                                day: 'numeric',
+                                weekday: 'short'
+                              })}
+                            </span>
+                            <span className="text-xs text-gray-600">
+                              {stats.completed}/{stats.total}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1">
+                            <div
+                              className="bg-green-500 h-1 rounded-full transition-all duration-300"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Categories */}
+      {categories.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">分类浏览</h2>
+          <div className="flex flex-wrap gap-3">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/?category=${category.slug}`}
+                className="category-badge"
+                style={{ backgroundColor: category.color + "20", color: category.color }}
+              >
+                {category.icon && <span className="mr-1">{category.icon}</span>}
+                {category.name}
+                <span className="ml-1 text-xs opacity-75">
+                  ({category._count.exhibits})
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Life Record Categories */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-6">人生记录分类</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          
+          {/* 大事记 / 人生里程碑 */}
+          <div className="museum-card p-6 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🏆</div>
+              <h3 className="text-lg font-semibold text-amber-800">
+                大事记 / 人生里程碑
+              </h3>
+              <p className="text-xs text-amber-600 uppercase tracking-wide font-medium">
+                Milestones
+              </p>
+            </div>
+            <p className="text-sm text-amber-700 mb-4 leading-relaxed">
+              对人生有重大影响或转折意义的事件。毕业、第一份工作、升职、结婚、生子、买房、创业等关键节点。
+            </p>
+            <div className="text-xs text-amber-600 bg-amber-100 rounded-lg p-2">
+              <strong>记录目的：</strong>构建个人生命史，回顾人生的关键节点和成长轨迹。可以每年年底整理一次，形成年度大事记。
+            </div>
+            <Link 
+              href="/admin?category=milestones"
+              className="inline-block w-full text-center mt-4 px-3 py-2 bg-amber-200 text-amber-800 rounded-md text-sm font-medium hover:bg-amber-300 transition-colors"
+            >
+              记录里程碑
+            </Link>
+          </div>
+
+          {/* 生活琐事 / 日常小确幸 */}
+          <div className="museum-card p-6 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🌸</div>
+              <h3 className="text-lg font-semibold text-green-800">
+                生活琐事 / 日常小确幸
+              </h3>
+              <p className="text-xs text-green-600 uppercase tracking-wide font-medium">
+                Daily Trifles & Small Joys
+              </p>
+            </div>
+            <p className="text-sm text-green-700 mb-4 leading-relaxed">
+              日常生活中那些微小但确切的幸福瞬间。美食、晚霞、好书、愉快长谈、午后阳光、宠物陪伴等。
+            </p>
+            <div className="text-xs text-green-600 bg-green-100 rounded-lg p-2">
+              <strong>记录目的：</strong>培养感恩和发现美的能力，提升幸福感，对抗生活的平淡和焦虑。
+            </div>
+            <Link 
+              href="/admin?category=daily-joys"
+              className="inline-block w-full text-center mt-4 px-3 py-2 bg-green-200 text-green-800 rounded-md text-sm font-medium hover:bg-green-300 transition-colors"
+            >
+              记录小确幸
+            </Link>
+          </div>
+
+          {/* 挑战与成长 */}
+          <div className="museum-card p-6 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">💪</div>
+              <h3 className="text-lg font-semibold text-blue-800">
+                挑战与成长
+              </h3>
+              <p className="text-xs text-blue-600 uppercase tracking-wide font-medium">
+                Challenges & Growth
+              </p>
+            </div>
+            <p className="text-sm text-blue-700 mb-4 leading-relaxed">
+              遇到的困难、犯下的错误、克服的恐惧以及从中得到的经验和教训。失败项目、争执反思、新技能学习等。
+            </p>
+            <div className="text-xs text-blue-600 bg-blue-100 rounded-lg p-2">
+              <strong>记录目的：</strong>复盘和反思，将挫折转化为成长的养分，看到自己的坚韧和进步。
+            </div>
+            <Link 
+              href="/admin?category=growth-challenges"
+              className="inline-block w-full text-center mt-4 px-3 py-2 bg-blue-200 text-blue-800 rounded-md text-sm font-medium hover:bg-blue-300 transition-colors"
+            >
+              记录成长
+            </Link>
+          </div>
+
+          {/* 探索空间 */}
+          <div className="museum-card p-6 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🎯</div>
+              <h3 className="text-lg font-semibold text-purple-800">
+                探索空间
+              </h3>
+              <p className="text-xs text-purple-600 uppercase tracking-wide font-medium">
+                To Be Defined
+              </p>
+            </div>
+            <p className="text-sm text-purple-700 mb-4 leading-relaxed">
+              等待发现的人生新维度。也许是梦境记录、创意灵感、人际关系图谱，或是您独特的生活哲学...
+            </p>
+            <div className="text-xs text-purple-600 bg-purple-100 rounded-lg p-2">
+              <strong>等待您来定义：</strong>这个空间留给您的创意和想象，定制属于您的独特记录方式。
+            </div>
+            <Link 
+              href="/admin?category=exploration"
+              className="inline-block w-full text-center mt-4 px-3 py-2 bg-purple-200 text-purple-800 rounded-md text-sm font-medium hover:bg-purple-300 transition-colors"
+            >
+              开始探索
+            </Link>
+          </div>
+
+          {/* 娱乐文化 */}
+          <div className="museum-card p-6 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🎬</div>
+              <h3 className="text-lg font-semibold text-orange-800">
+                娱乐文化
+              </h3>
+              <p className="text-xs text-orange-600 uppercase tracking-wide font-medium">
+                Entertainment & Culture
+              </p>
+            </div>
+            <p className="text-sm text-orange-700 mb-4 leading-relaxed">
+              记录您的文化消费和娱乐体验。电影、电视剧、音乐、书籍、游戏、展览等文化活动的感受和思考。
+            </p>
+            <div className="text-xs text-orange-600 bg-orange-100 rounded-lg p-2">
+              <strong>记录目的：</strong>追踪个人文化品味的变化，记录作品带来的启发和感动，构建专属的文化记忆库。
+            </div>
+            <button 
+              onClick={() => setExpandedEntertainment(!expandedEntertainment)}
+              className="inline-block w-full text-center mt-4 px-3 py-2 bg-orange-200 text-orange-800 rounded-md text-sm font-medium hover:bg-orange-300 transition-colors"
+            >
+              {expandedEntertainment ? '收起分类' : '展开分类'}
+            </button>
+          </div>
+        </div>
+
+        {/* 娱乐文化子分类 */}
+        {expandedEntertainment && (
+          <div className="mt-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">娱乐文化分类</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* 电影 */}
+              <div className="museum-card p-4 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
+                <div className="text-center mb-3">
+                  <div className="text-3xl mb-2">🎬</div>
+                  <h4 className="text-md font-semibold text-red-800">电影</h4>
+                  <p className="text-xs text-red-600 uppercase tracking-wide font-medium">Movies</p>
+                </div>
+                <p className="text-xs text-red-700 mb-3 leading-relaxed">
+                  记录观影体验和电影评价，影评、推荐清单等。
+                </p>
+                <Link 
+                  href="/admin?category=movies"
+                  className="inline-block w-full text-center px-2 py-1 bg-red-200 text-red-800 rounded text-xs font-medium hover:bg-red-300 transition-colors"
+                >
+                  记录电影
+                </Link>
+              </div>
+
+              {/* 电视剧 */}
+              <div className="museum-card p-4 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                <div className="text-center mb-3">
+                  <div className="text-3xl mb-2">📺</div>
+                  <h4 className="text-md font-semibold text-blue-800">电视剧</h4>
+                  <p className="text-xs text-blue-600 uppercase tracking-wide font-medium">TV Series</p>
+                </div>
+                <p className="text-xs text-blue-700 mb-3 leading-relaxed">
+                  记录追剧体验和剧集评价，角色分析、剧情讨论等。
+                </p>
+                <Link 
+                  href="/admin?category=tv-series"
+                  className="inline-block w-full text-center px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs font-medium hover:bg-blue-300 transition-colors"
+                >
+                  记录电视剧
+                </Link>
+              </div>
+
+              {/* 书籍 */}
+              <div className="museum-card p-4 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                <div className="text-center mb-3">
+                  <div className="text-3xl mb-2">📚</div>
+                  <h4 className="text-md font-semibold text-green-800">书籍</h4>
+                  <p className="text-xs text-green-600 uppercase tracking-wide font-medium">Books</p>
+                </div>
+                <p className="text-xs text-green-700 mb-3 leading-relaxed">
+                  记录阅读体验和读书笔记，书评、阅读感悟等。
+                </p>
+                <Link 
+                  href="/admin?category=books"
+                  className="inline-block w-full text-center px-2 py-1 bg-green-200 text-green-800 rounded text-xs font-medium hover:bg-green-300 transition-colors"
+                >
+                  记录书籍
+                </Link>
+              </div>
+
+              {/* 音乐 */}
+              <div className="museum-card p-4 hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-pink-50 to-rose-50 border-pink-200">
+                <div className="text-center mb-3">
+                  <div className="text-3xl mb-2">🎵</div>
+                  <h4 className="text-md font-semibold text-pink-800">音乐</h4>
+                  <p className="text-xs text-pink-600 uppercase tracking-wide font-medium">Music</p>
+                </div>
+                <p className="text-xs text-pink-700 mb-3 leading-relaxed">
+                  记录音乐体验和感受，歌曲推荐、演唱会体验等。
+                </p>
+                <Link 
+                  href="/admin?category=music"
+                  className="inline-block w-full text-center px-2 py-1 bg-pink-200 text-pink-800 rounded text-xs font-medium hover:bg-pink-300 transition-colors"
+                >
+                  记录音乐
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 最新展品预览 */}
+        {exhibits.length > 0 && (
+          <div className="mt-12">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">最新记录</h3>
+              <Link 
+                href="/admin"
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              >
+                查看全部 →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {exhibits.slice(0, 3).map((exhibit) => (
+                <Link
+                  key={exhibit.id}
+                  href={`/exhibit/${exhibit.slug}`}
+                  className="museum-card p-4 block hover:scale-105 transition-transform duration-200"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="category-badge text-xs"
+                      style={{ 
+                        backgroundColor: exhibit.category.color + "20", 
+                        color: exhibit.category.color 
+                      }}
+                    >
+                      {exhibit.category.name}
+                    </span>
+                    
+                    {/* 显示特殊标签 */}
+                    {exhibit.payload && typeof exhibit.payload === 'object' && 
+                     'specialTags' in exhibit.payload && 
+                     Array.isArray(exhibit.payload.specialTags) && 
+                     exhibit.payload.specialTags.length > 0 && (
+                      <div className="flex gap-1">
+                        {(exhibit.payload.specialTags as string[]).map((tagId: string) => {
+                          const tagLabels = {
+                            'milestone': '🏆',
+                            'daily-joy': '🌸', 
+                            'growth': '💪',
+                            'exploration': '🎯'
+                          };
+                          return (
+                            <span
+                              key={tagId}
+                              className="text-xs"
+                              title={
+                                tagId === 'milestone' ? '大事记 / 人生里程碑' :
+                                tagId === 'daily-joy' ? '生活琐事 / 日常小确幸' :
+                                tagId === 'growth' ? '挑战与成长' :
+                                tagId === 'exploration' ? '探索空间' : ''
+                              }
+                            >
+                              {tagLabels[tagId as keyof typeof tagLabels]}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {exhibit.emotionScore && (
+                      <div className="flex items-center text-xs text-gray-500">
+                        <span className="mr-1">情绪:</span>
+                        <div className="emotion-bar w-12">
+                          <div
+                            className="emotion-fill"
+                            style={{
+                              width: `${exhibit.emotionScore * 10}%`,
+                              backgroundColor: getEmotionColor(exhibit.emotionScore),
+                            }}
+                          />
+                        </div>
+                        <span className="ml-1">{exhibit.emotionScore}/10</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <h4 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
+                    {exhibit.title}
+                  </h4>
+                  
+                  {exhibit.description && (
+                    <p className="text-gray-600 text-xs mb-2 line-clamp-2">
+                      {exhibit.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{exhibit.user.name || "匿名用户"}</span>
+                    <span>{new Date(exhibit.createdAt).toLocaleDateString("zh-CN")}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {exhibits.length === 0 && (
+          <div className="text-center py-8 mt-8 bg-gray-50 rounded-lg">
+            <div className="text-gray-400 text-4xl mb-3">📝</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              开始您的人生记录之旅
+            </h3>
+            <p className="text-gray-600 mb-4">
+              选择一个分类，记录您人生中的珍贵瞬间
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getEmotionColor(score: number): string {
+  if (score <= 3) return "#ef4444"; // red
+  if (score <= 5) return "#f59e0b"; // amber
+  if (score <= 7) return "#10b981"; // emerald
+  return "#3b82f6"; // blue
+} 

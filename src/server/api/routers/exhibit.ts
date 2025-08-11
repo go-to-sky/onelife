@@ -3,6 +3,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
+  adminProcedure,
 } from "../trpc";
 
 // Utility function to generate slug from title
@@ -174,14 +175,14 @@ export const exhibitRouter = createTRPCRouter({
       return exhibit;
     }),
 
-  // Create new exhibit (临时改为公共访问，正式版应使用 protectedProcedure)
-  create: publicProcedure
+  // Create new exhibit
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1).max(200),
         description: z.string().optional(),
         content: z.string().min(1),
-        coverImage: z.string().url().optional().or(z.literal("")),
+        coverImage: z.string().optional().or(z.literal("")),
         categoryId: z.string(),
         visibility: z.enum(["PRIVATE", "SHARED", "PUBLIC", "UNLISTED"]).default("PRIVATE"),
         emotionScore: z.number().min(1).max(10).optional(),
@@ -191,11 +192,11 @@ export const exhibitRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { db } = ctx;
+      const { db, session } = ctx;
       const { tags, ...data } = input;
 
-      // 临时使用固定的用户 ID (正式版应该从 session 获取)
-      const userId = "temp-user-id";
+      // 从 session 获取用户 ID
+      const userId = session.user.id;
       
       // 处理分类ID - 如果传入的是slug，则查找对应的ID
       let categoryId = data.categoryId;
@@ -242,8 +243,6 @@ export const exhibitRouter = createTRPCRouter({
         },
       });
 
-      // Return minimal response to avoid serialization issues
-
       // Handle tags if provided
       if (tags && tags.length > 0) {
         for (const tagName of tags) {
@@ -282,7 +281,7 @@ export const exhibitRouter = createTRPCRouter({
         title: z.string().min(1).max(200).optional(),
         description: z.string().optional(),
         content: z.string().min(1).optional(),
-        coverImage: z.string().url().optional().or(z.literal("")),
+        coverImage: z.string().optional().or(z.literal("")),
         categoryId: z.string().optional(),
         visibility: z.enum(["PRIVATE", "SHARED", "PUBLIC", "UNLISTED"]).optional(),
         emotionScore: z.number().min(1).max(10).optional(),
@@ -295,13 +294,21 @@ export const exhibitRouter = createTRPCRouter({
       const { db, session } = ctx;
       const { id, tags, ...data } = input;
 
-      // Check ownership
+      // Check ownership or admin permission
       const existing = await db.exhibit.findUnique({
         where: { id },
         select: { userId: true },
       });
 
-      if (!existing || existing.userId !== session.user.id) {
+      if (!existing) {
+        throw new Error("展品不存在");
+      }
+
+      // 允许管理员编辑任何展品，或者用户编辑自己的展品
+      const isAdmin = session.user.isAdmin === true;
+      const isOwner = existing.userId === session.user.id;
+      
+      if (!isAdmin && !isOwner) {
         throw new Error("无权编辑此展品");
       }
 
@@ -364,13 +371,13 @@ export const exhibitRouter = createTRPCRouter({
       return exhibit;
     }),
 
-  // Delete exhibit (临时改为公共访问)
-  delete: publicProcedure
+  // Delete exhibit
+  delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const { db } = ctx;
+      const { db, session } = ctx;
 
-      // 临时跳过所有权检查 (正式版应该检查)
+      // Check ownership or admin permission
       const exhibit = await db.exhibit.findUnique({
         where: { id: input.id },
         select: { userId: true },
@@ -380,10 +387,27 @@ export const exhibitRouter = createTRPCRouter({
         throw new Error("展品不存在");
       }
 
+      // 允许管理员删除任何展品，或者用户删除自己的展品
+      const isAdmin = session.user.isAdmin === true;
+      const isOwner = exhibit.userId === session.user.id;
+      
+      if (!isAdmin && !isOwner) {
+        throw new Error("无权删除此展品");
+      }
+
       await db.exhibit.delete({
         where: { id: input.id },
       });
 
+      return { success: true };
+    }),
+
+  // 管理员强制删除（示例）
+  adminDelete: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { db } = ctx;
+      await db.exhibit.delete({ where: { id: input.id } });
       return { success: true };
     }),
 }); 

@@ -1,0 +1,14 @@
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	diff.astextplain.textconv=astextplain
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	filter.lfs.clean=git-lfs clean -- %f
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	filter.lfs.smudge=git-lfs smudge -- %f
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	filter.lfs.process=git-lfs filter-process
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	filter.lfs.required=true
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	http.sslbackend=openssl
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	http.sslcainfo=D:/Git/mingw64/etc/ssl/certs/ca-bundle.crt
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	core.autocrlf=true
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	core.fscache=true
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	core.symlinks=false
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	pull.rebase=false
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	credential.helper=manager
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	credential.https://dev.azure.com.usehttppath=true
+file:"C:/\346\226\260\345\212\240\345\215\267/Git/etc/gitconfig"	init.defaultbranch=master

@@ -2,7 +2,7 @@ import { type Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
 export default {
-  content: ["./src/**/*.tsx"],
+  content: ["./src/**/*.{ts,tsx,css,md,mdx}"],
   theme: {
     extend: {
       fontFamily: {
@@ -23,5 +23,10 @@ export default {
       }
     },
   },
+  safelist: [
+    // Admin 页面中动态颜色类（由变量拼接），需显式 safelist
+    { pattern: /bg-(amber|green|blue|purple)-100/ },
+    { pattern: /text-(amber|green|blue|purple)-800/ },
+  ],
   plugins: [],
 } satisfies Config; 

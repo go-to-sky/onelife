@@ -72,8 +72,15 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
 }
 
 function getBaseUrl() {
-  if (typeof window !== "undefined") return window.location.origin;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  // 在服务器端，尝试使用动态端口或默认3000
-  return `http://localhost:${process.env.PORT ?? 3000}`;
+  if (typeof window !== "undefined") {
+    // 浏览器端：使用当前页面的 origin
+    return window.location.origin;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  // 服务器端：检查多个可能的端口
+  const port = process.env.PORT || 
+               (process.env.NODE_ENV === "development" ? "3003" : "3000");
+  return `http://localhost:${port}`;
 } 

@@ -63,6 +63,12 @@ const categories = [
     color: '#be185d',
     icon: '📚',
   },
+  {
+    name: '娱乐文化',
+    slug: 'entertainment-culture',
+    color: '#f59e0b',
+    icon: '🎬',
+  },
 ];
 
 async function main() {
@@ -84,11 +90,12 @@ async function main() {
   // 创建示例用户
   const user = await prisma.user.upsert({
     where: { email: 'demo@example.com' },
-    update: {},
+    update: { isAdmin: true },
     create: {
       id: 'temp-user-id',
       email: 'demo@example.com',
       name: '演示用户',
+      isAdmin: true,
     },
   });
 
@@ -284,3 +291,17 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   }); 
+
+// 数据迁移：将旧的任务分类批量更新为新分类
+async function migrateTaskCategory() {
+  await prisma.task.updateMany({
+    where: { category: 'STUDY' as any },
+    data: { category: 'STUDY_LONG_TERM' as any },
+  });
+  await prisma.task.updateMany({
+    where: { category: 'DAILY_LIFE' as any },
+    data: { category: 'LIFE_LONG_TERM' as any },
+  });
+}
+
+migrateTaskCategory().then(() => console.log('任务分类数据迁移完成')).catch(console.error); 

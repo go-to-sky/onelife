@@ -7,8 +7,8 @@ const config = {
   plugins: ["@typescript-eslint"],
   extends: [
     "next/core-web-vitals",
-    "@typescript-eslint/recommended-type-checked",
-    "@typescript-eslint/stylistic-type-checked",
+    "plugin:@typescript-eslint/recommended-type-checked",
+    "plugin:@typescript-eslint/stylistic-type-checked",
   ],
   rules: {
     "@typescript-eslint/array-type": "off",
@@ -16,7 +16,7 @@ const config = {
     "@typescript-eslint/consistent-type-imports": [
       "warn",
       {
-        prefer: "type-only",
+        prefer: "type-imports",
         fixStyle: "inline-type-imports",
       },
     ],

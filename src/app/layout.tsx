@@ -6,7 +6,7 @@ import { type Metadata } from "next";
 import { TRPCReactProvider } from "../trpc/react";
 
 export const metadata: Metadata = {
-  title: "人生博物馆 | Life Museum",
+  title: "一个人的一生 | Life Museum",
   description: "记录生命中每一个有意义的瞬间",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
@@ -26,7 +26,7 @@ export default function RootLayout({
                 <div className="flex justify-between items-center h-16">
                   <div className="flex items-center">
                     <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      人生博物馆
+                      一个人的一生
                     </h1>
                   </div>
                   <div className="flex items-center space-x-4">
@@ -52,7 +52,7 @@ export default function RootLayout({
             <footer className="bg-white border-t border-gray-200 mt-16">
               <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
                 <div className="text-center text-gray-500 text-sm">
-                  <p>© 2024 人生博物馆. 记录每一个有意义的瞬间.</p>
+                  <p>© 2024 一个人的一生. 记录每一个有意义的瞬间.</p>
                 </div>
               </div>
             </footer>

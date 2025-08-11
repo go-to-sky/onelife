@@ -4,10 +4,21 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "../../trpc/react";
+import FileUpload from "./components/FileUpload";
+import { Suspense } from "react";
 
-export default function AdminPage() {
-  // 暂时跳过认证，使用模拟用户
-  const mockSession = { user: { id: "temp-user", name: "临时用户", email: "temp@example.com" } };
+export const dynamic = "force-dynamic";
+
+function AdminPageInner() {
+  // 使用模拟管理员用户
+  const mockSession = { 
+    user: { 
+      id: "temp-user", 
+      name: "管理员", 
+      email: "admin@example.com",
+      isAdmin: true 
+    } 
+  };
   const session = mockSession;
   const status = "authenticated";
   const [isCreating, setIsCreating] = useState(false);
@@ -46,6 +57,41 @@ export default function AdminPage() {
       icon: '🎯',
       color: 'purple',
       examples: '梦境记录、创意灵感、人际关系图谱、生活哲学等'
+    },
+    'entertainment-culture': {
+      title: '娱乐文化',
+      description: '记录您的文化消费和娱乐体验',
+      icon: '🎬',
+      color: 'orange',
+      examples: '电影观后感、电视剧评价、读书笔记、音乐感受等'
+    },
+    'movies': {
+      title: '电影',
+      description: '记录观影体验和电影评价',
+      icon: '🎬',
+      color: 'red',
+      examples: '电影观后感、影评、推荐清单等'
+    },
+    'tv-series': {
+      title: '电视剧',
+      description: '记录追剧体验和剧集评价',
+      icon: '📺',
+      color: 'blue',
+      examples: '剧集评价、角色分析、剧情讨论等'
+    },
+    'books': {
+      title: '书籍',
+      description: '记录阅读体验和读书笔记',
+      icon: '📚',
+      color: 'green',
+      examples: '读书笔记、书评、阅读感悟等'
+    },
+    'music': {
+      title: '音乐',
+      description: '记录音乐体验和感受',
+      icon: '🎵',
+      color: 'pink',
+      examples: '歌曲推荐、音乐感受、演唱会体验等'
     }
   };
   
@@ -62,7 +108,12 @@ export default function AdminPage() {
       'milestones': '人生账本',
       'daily-joys': '时间切片', 
       'growth-challenges': '情绪肖像',
-      'exploration': '梦境档案'
+      'exploration': '梦境档案',
+      'entertainment-culture': '娱乐文化',
+      'movies': '娱乐文化',
+      'tv-series': '娱乐文化',
+      'books': '娱乐文化',
+      'music': '娱乐文化'
     };
     
     const targetCategoryName = categoryMap[categoryParam];
@@ -136,7 +187,7 @@ export default function AdminPage() {
             <>
               <h1 className="text-3xl font-bold text-gray-900">管理后台</h1>
               <p className="text-gray-600">
-                欢迎回来，{session.user.name || session.user.email}
+                管理和创建您的人生展品
               </p>
             </>
           )}
@@ -151,7 +202,7 @@ export default function AdminPage() {
         <div className="flex items-center gap-4">
           {currentCategory && (
             <Link
-              href="/admin"
+              href="/"
               className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
             >
               ← 返回全部
@@ -162,12 +213,6 @@ export default function AdminPage() {
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
           >
             {currentCategory ? `记录${currentCategory.title.split(' / ')[0]}` : '创建新展品'}
-          </button>
-          <button
-            onClick={() => alert("认证功能暂未启用")}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors"
-          >
-            退出登录
           </button>
         </div>
       </div>
@@ -236,6 +281,38 @@ export default function AdminPage() {
                     >
                       {exhibit.category.name}
                     </span>
+                    
+                    {/* 显示特殊标签 */}
+                    {exhibit.payload && typeof exhibit.payload === 'object' && 
+                     'specialTags' in exhibit.payload && 
+                     Array.isArray(exhibit.payload.specialTags) && 
+                     exhibit.payload.specialTags.length > 0 && (
+                      <div className="flex gap-1">
+                        {(exhibit.payload.specialTags as string[]).map((tagId: string) => {
+                          const tagLabels = {
+                            'milestone': '🏆',
+                            'daily-joy': '🌸', 
+                            'growth': '💪',
+                            'exploration': '🎯'
+                          };
+                          return (
+                            <span
+                              key={tagId}
+                              className="text-xs px-1 py-0.5 bg-gray-100 rounded"
+                              title={
+                                tagId === 'milestone' ? '大事记 / 人生里程碑' :
+                                tagId === 'daily-joy' ? '生活琐事 / 日常小确幸' :
+                                tagId === 'growth' ? '挑战与成长' :
+                                tagId === 'exploration' ? '探索空间' : ''
+                              }
+                            >
+                              {tagLabels[tagId as keyof typeof tagLabels]}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
                     <span className="text-xs text-gray-500">
                       {exhibit.visibility}
                     </span>
@@ -295,6 +372,14 @@ export default function AdminPage() {
   );
 }
 
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-600">加载中...</div>}>
+      <AdminPageInner />
+    </Suspense>
+  );
+}
+
 function EditExhibitForm({
   categories,
   exhibit,
@@ -318,6 +403,7 @@ function EditExhibitForm({
     emotionScore: exhibit.emotionScore || 5,
     tags: exhibit.tags?.map((tag: any) => (tag as any).tag.name).join(", ") || "",
     exhibitDate: exhibit.exhibitDate ? new Date(exhibit.exhibitDate).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+    specialTags: (exhibit.payload?.specialTags as string[]) || [], // 从 payload 中读取特殊标签
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -331,6 +417,9 @@ function EditExhibitForm({
       ...formData,
       tags: formData.tags ? formData.tags.split(",").map((tag: string) => tag.trim()) : [],
       exhibitDate: new Date(formData.exhibitDate),
+      payload: {
+        specialTags: formData.specialTags, // 将特殊标签保存到 payload
+      },
     };
     
     onSubmit(submitData);
@@ -388,16 +477,12 @@ function EditExhibitForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                封面图片 URL
-              </label>
-              <input
-                type="url"
-                value={formData.coverImage}
-                onChange={(e) =>
-                  setFormData({ ...formData, coverImage: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <FileUpload
+                onFileChange={(fileData) => setFormData({ ...formData, coverImage: fileData || "" })}
+                currentValue={formData.coverImage}
+                accept="image/*,video/*"
+                maxSize={5}
+                label="封面图片/视频"
               />
             </div>
 
@@ -433,6 +518,7 @@ function EditExhibitForm({
                       <option value="temp-alternate-reality">平行时空 🌌</option>
                       <option value="temp-recurring-motifs">母题地图 🗺️</option>
                       <option value="temp-lexicon-collection">语言收藏 📚</option>
+                      <option value="temp-entertainment-culture">娱乐文化 🎬</option>
                     </>
                   )}
                 </select>
@@ -509,6 +595,47 @@ function EditExhibitForm({
                 placeholder="回忆, 成长, 感悟"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                特殊标签 (可选，可多选)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'milestone', label: '大事记 / 人生里程碑', color: 'amber' },
+                  { id: 'daily-joy', label: '生活琐事 / 日常小确幸', color: 'green' },
+                  { id: 'growth', label: '挑战与成长', color: 'blue' },
+                  { id: 'exploration', label: '探索空间', color: 'purple' }
+                ].map((tag) => (
+                  <label key={tag.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.specialTags.includes(tag.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            specialTags: [...formData.specialTags, tag.id]
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            specialTags: formData.specialTags.filter(t => t !== tag.id)
+                          });
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <span className={`text-sm px-2 py-1 rounded-full bg-${tag.color}-100 text-${tag.color}-800`}>
+                      {tag.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                这些标签帮助您更好地分类和回顾人生记录
+              </p>
             </div>
 
             <div className="flex justify-end gap-4 pt-4">
@@ -574,6 +701,7 @@ function CreateExhibitForm({
     emotionScore: 5,
     tags: "",
     exhibitDate: new Date().toISOString().slice(0, 16), // 默认为当前时间
+    specialTags: [] as string[], // 添加特殊标签字段
   });
 
   // 当categories加载完成后，更新categoryId
@@ -605,7 +733,8 @@ function CreateExhibitForm({
       'temp-shadow-collection': 'shadow-collection',
       'temp-alternate-reality': 'alternate-reality',
       'temp-recurring-motifs': 'recurring-motifs',
-      'temp-lexicon-collection': 'lexicon-collection'
+      'temp-lexicon-collection': 'lexicon-collection',
+      'temp-entertainment-culture': 'entertainment-culture'
     };
     
     if (categoryId.startsWith('temp-')) {
@@ -617,6 +746,9 @@ function CreateExhibitForm({
       categoryId,
       tags: formData.tags ? formData.tags.split(",").map((tag: string) => tag.trim()) : [],
       exhibitDate: new Date(formData.exhibitDate), // 转换用户选择的时间
+      payload: {
+        specialTags: formData.specialTags, // 将特殊标签保存到 payload
+      },
     };
     
     onSubmit(submitData);
@@ -674,16 +806,12 @@ function CreateExhibitForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                封面图片 URL
-              </label>
-              <input
-                type="url"
-                value={formData.coverImage}
-                onChange={(e) =>
-                  setFormData({ ...formData, coverImage: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <FileUpload
+                onFileChange={(fileData) => setFormData({ ...formData, coverImage: fileData || "" })}
+                currentValue={formData.coverImage}
+                accept="image/*,video/*"
+                maxSize={5}
+                label="封面图片/视频"
               />
             </div>
 
@@ -720,6 +848,7 @@ function CreateExhibitForm({
                       <option value="temp-alternate-reality">平行时空 🌌</option>
                       <option value="temp-recurring-motifs">母题地图 🗺️</option>
                       <option value="temp-lexicon-collection">语言收藏 📚</option>
+                      <option value="temp-entertainment-culture">娱乐文化 🎬</option>
                     </>
                   )}
                 </select>
@@ -796,6 +925,47 @@ function CreateExhibitForm({
                 placeholder="回忆, 成长, 感悟"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                特殊标签 (可选，可多选)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'milestone', label: '大事记 / 人生里程碑', color: 'amber' },
+                  { id: 'daily-joy', label: '生活琐事 / 日常小确幸', color: 'green' },
+                  { id: 'growth', label: '挑战与成长', color: 'blue' },
+                  { id: 'exploration', label: '探索空间', color: 'purple' }
+                ].map((tag) => (
+                  <label key={tag.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.specialTags.includes(tag.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            specialTags: [...formData.specialTags, tag.id]
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            specialTags: formData.specialTags.filter(t => t !== tag.id)
+                          });
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <span className={`text-sm px-2 py-1 rounded-full bg-${tag.color}-100 text-${tag.color}-800`}>
+                      {tag.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                这些标签帮助您更好地分类和回顾人生记录
+              </p>
             </div>
 
             <div className="flex justify-end gap-4 pt-4">
