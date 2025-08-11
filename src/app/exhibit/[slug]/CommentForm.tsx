@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "../../../trpc/react";
 
-export default function CommentForm({ exhibitId, onSubmitted }: { exhibitId: string; onSubmitted?: () => void; }) {
+export default function CommentForm({ exhibitId }: { exhibitId: string }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const createComment = api.comment.create.useMutation();
+  const router = useRouter();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,7 +17,7 @@ export default function CommentForm({ exhibitId, onSubmitted }: { exhibitId: str
     try {
       await createComment.mutateAsync({ exhibitId, content });
       setContent("");
-      onSubmitted?.();
+      router.refresh();
     } catch (err) {
       console.error(err);
       alert("评论提交失败");

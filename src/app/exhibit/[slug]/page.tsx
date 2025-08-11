@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 // Markdown 安全增强已启用（remark-gfm、rehype-sanitize）
 import CommentForm from "./CommentForm";
-import { revalidatePath } from "next/cache";
+import DeleteCommentButton from "./DeleteCommentButton";
 
 interface PageProps {
   params: {
@@ -165,87 +165,11 @@ export default async function ExhibitPage({ params }: PageProps) {
 
         {/* Comments */}
         <div className="museum-card p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">
-            评论 ({exhibit.comments?.length || 0})
-          </h2>
-          
-          {!exhibit.comments || exhibit.comments.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              还没有评论，成为第一个评论者吧！
-            </p>
-          ) : (
-            <div className="space-y-6">
-              {exhibit.comments.map((comment: any) => (
-                <div key={comment.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                  <div className="flex items-start gap-3">
-                    {comment.author.image && (
-                      <Image
-                        src={comment.author.image}
-                        alt={comment.author.name || "用户"}
-                        width={40}
-                        height={40}
-                        className="rounded-full"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-gray-900">
-                          {comment.author.name || "匿名用户"}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {new Date(comment.createdAt).toLocaleDateString("zh-CN")}
-                        </span>
-                      </div>
-                      <p className="text-gray-700 whitespace-pre-wrap">
-                        {comment.content}
-                      </p>
-                      
-                      {/* Replies */}
-                      {comment.replies && comment.replies.length > 0 && (
-                        <div className="ml-6 mt-4 space-y-4">
-                          {comment.replies.map((reply: any) => (
-                            <div key={reply.id} className="flex items-start gap-3">
-                              {reply.author.image && (
-                                <Image
-                                  src={reply.author.image}
-                                  alt={reply.author.name || "用户"}
-                                  width={32}
-                                  height={32}
-                                  className="rounded-full"
-                                />
-                              )}
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-gray-900 text-sm">
-                                    {reply.author.name || "匿名用户"}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {new Date(reply.createdAt).toLocaleDateString("zh-CN")}
-                                  </span>
-                                </div>
-                                <p className="text-gray-700 text-sm whitespace-pre-wrap">
-                                  {reply.content}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6">评论</h2>
+          <CommentList exhibitId={exhibit.id} />
 
           {/* Comment Form */}
-          <CommentForm
-            exhibitId={exhibit.id}
-            onSubmitted={() => {
-              // 触发页面刷新以获取最新评论
-              revalidatePath(`/exhibit/${exhibit.slug}`);
-            }}
-          />
+          <CommentForm exhibitId={exhibit.id} />
         </div>
 
         {/* Back to Home */}
