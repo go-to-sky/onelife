@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 // Markdown 安全增强已启用（remark-gfm、rehype-sanitize）
 import CommentForm from "./CommentForm";
+import CommentList from "./CommentList";
 import DeleteCommentButton from "./DeleteCommentButton";
 
 interface PageProps {
